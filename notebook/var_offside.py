@@ -153,44 +153,25 @@ def _(mo):
 def _(install_btn, mo, os, subprocess, sys):
     if install_btn.value:
         import torch as _torch
-        import torch.utils.cpp_extension as _cpp_ext
         with mo.status.spinner(title="Installing detectron2 + MoGe2..."):
             _pybin = sys.executable
             subprocess.run([_pybin, "-m", "pip", "install", "setuptools<81"], check=True)
 
-            os.environ["TORCH_CUDA_ARCH_LIST"] = "8.0"
-            os.environ["FORCE_CUDA"] = "1"
+            os.environ.pop("FORCE_CUDA", None)
+            os.environ.pop("CUDA_HOME", None)
+            os.environ.pop("TORCH_CUDA_ARCH_LIST", None)
 
-            _cuda_homes = [
-                os.environ.get("CUDA_HOME", ""),
-                "/usr/local/cuda",
-                "/usr/lib/cuda",
-                "/opt/cuda",
-            ]
-            for _ch in _cuda_homes:
-                if _ch and os.path.isdir(_ch):
-                    os.environ["CUDA_HOME"] = _ch
-                    break
-            if "CUDA_HOME" not in os.environ or not os.environ["CUDA_HOME"]:
-                mo.md("⚠️ CUDA toolkit not found — skipping detectron2 build. "
-                      "The ViTDet detector will not work, but you can still load "
-                      "the SAM 3D Body model for inference without detection.").callout(kind="warn")
-            else:
-                import re as _re
-                _cpp = _cpp_ext.__file__
-                _src = open(_cpp).read()
-                _src = _re.sub(r"raise RuntimeError\(CUDA_MISMATCH_MESSAGE.*", "pass", _src)
-                open(_cpp, "w").write(_src)
-                subprocess.run([
-                    _pybin, "-m", "pip", "install",
-                    "git+https://github.com/facebookresearch/detectron2.git@a1ce2f9",
-                    "--no-build-isolation", "--no-deps"
-                ], check=True)
-                subprocess.run([
-                    _pybin, "-m", "pip", "install",
-                    "git+https://github.com/microsoft/MoGe.git"
-                ], check=False)
-                mo.md("✅ Dependencies installed.").callout(kind="success")
+            subprocess.run([
+                _pybin, "-m", "pip", "install",
+                "git+https://github.com/facebookresearch/detectron2.git@a1ce2f9",
+                "--no-build-isolation", "--no-deps"
+            ], check=True)
+            subprocess.run([
+                _pybin, "-m", "pip", "install",
+                "git+https://github.com/microsoft/MoGe.git"
+            ], check=False)
+        mo.md("✅ Dependencies installed (CPU-only detectron2 — NMS/ROIAlign use "
+              "CPU fallbacks, but model inference still runs on GPU).").callout(kind="success")
     else:
         mo.md("Click the button above to install detectron2 and MoGe2.").callout(kind="info")
     return
