@@ -82,8 +82,10 @@ fi
 CKPT_DIR="$ROOT/checkpoints/sam-3d-body-dinov3"
 if [[ ! -f "$CKPT_DIR/model.ckpt" ]]; then
   echo "Downloading SAM 3D Body checkpoints from Hugging Face..."
-  python -m huggingface_hub.commands.huggingface_cli download \
-    facebook/sam-3d-body-dinov3 --local-dir "$CKPT_DIR"
+  python -c "
+from huggingface_hub import snapshot_download
+snapshot_download('facebook/sam-3d-body-dinov3', local_dir='$CKPT_DIR')
+"
 fi
 
 # Run the VAR pipeline
