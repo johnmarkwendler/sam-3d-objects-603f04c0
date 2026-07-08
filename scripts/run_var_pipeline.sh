@@ -19,7 +19,7 @@ if [[ -z "${HF_TOKEN:-}" && -z "${HUGGINGFACE_HUB_TOKEN:-}" ]]; then
   exit 2
 fi
 
-PYTHON_BIN="${PYTHON_BIN:-python}"
+PYTHON_BIN="${PYTHON_BIN:-$(command -v python3 || command -v python)}"
 ENV_DIR="$ROOT/.orx_env"
 
 if [[ ! -x "$ENV_DIR/bin/python" ]]; then
@@ -70,7 +70,8 @@ fi
 CKPT_DIR="$ROOT/checkpoints/sam-3d-body-dinov3"
 if [[ ! -f "$CKPT_DIR/model.ckpt" ]]; then
   echo "Downloading SAM 3D Body checkpoints from Hugging Face..."
-  hf download facebook/sam-3d-body-dinov3 --local-dir "$CKPT_DIR"
+  python -m huggingface_hub.commands.huggingface_cli download \
+    facebook/sam-3d-body-dinov3 --local-dir "$CKPT_DIR"
 fi
 
 # Run the VAR pipeline
