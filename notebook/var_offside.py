@@ -144,7 +144,7 @@ def _(mo):
 
 @app.cell
 def _(mo):
-    install_btn = mo.ui.run_button(label="Install dependencies (detectron2, MoGe2)")
+    install_btn = mo.ui.run_button(label="Install all dependencies")
     install_btn
     return install_btn,
 
@@ -153,9 +153,21 @@ def _(mo):
 def _(install_btn, mo, os, subprocess, sys):
     if install_btn.value:
         import torch as _torch
-        with mo.status.spinner(title="Installing detectron2 + MoGe2..."):
+        with mo.status.spinner(title="Installing SAM 3D Body dependencies..."):
             _pybin = sys.executable
+
             subprocess.run([_pybin, "-m", "pip", "install", "setuptools<81"], check=True)
+
+            subprocess.run([_pybin, "-m", "pip", "install"] + [
+                "pytorch-lightning", "pyrender", "opencv-python-headless",
+                "yacs", "scikit-image", "einops", "timm", "dill", "pandas",
+                "rich", "hydra-core", "hydra-submitit-launcher",
+                "hydra-colorlog", "pyrootutils", "webdataset", "chump",
+                "networkx==3.2.1", "roma", "joblib", "seaborn", "appdirs",
+                "cython", "jsonlines", "xtcocotools", "loguru", "optree",
+                "fvcore", "pycocotools", "trimesh", "plotly", "kaleido",
+                "braceexpand", "matplotlib",
+            ], check=True)
 
             os.environ.pop("FORCE_CUDA", None)
             os.environ.pop("CUDA_HOME", None)
@@ -170,10 +182,11 @@ def _(install_btn, mo, os, subprocess, sys):
                 _pybin, "-m", "pip", "install",
                 "git+https://github.com/microsoft/MoGe.git"
             ], check=False)
-        mo.md("✅ Dependencies installed (CPU-only detectron2 — NMS/ROIAlign use "
-              "CPU fallbacks, but model inference still runs on GPU).").callout(kind="success")
+        mo.md("✅ All dependencies installed. Click **Load SAM 3D Body model** "
+              "below.").callout(kind="success")
     else:
-        mo.md("Click the button above to install detectron2 and MoGe2.").callout(kind="info")
+        mo.md("Click the button above to install all dependencies (SAM 3D Body, "
+              "detectron2, MoGe2, and supporting packages).").callout(kind="info")
     return
 
 
