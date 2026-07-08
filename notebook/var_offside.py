@@ -69,15 +69,27 @@ def _(mo):
 def _():
     import os
     import sys
+    import subprocess
+    import importlib
+    import importlib.util
     import numpy as np
 
-    SAM3D_DIR = os.environ.get("SAM3D_DIR", "/app/sam-3d-body")
+    SAM3D_DIR = os.environ.get("SAM3D_DIR", "/root/sam-3d-body")
+    if not os.path.isdir(SAM3D_DIR):
+        SAM3D_DIR = "/tmp/sam-3d-body"
+    if not os.path.isdir(SAM3D_DIR):
+        print("Cloning sam-3d-body repo...")
+        subprocess.run(
+            ["git", "clone", "--depth", "1",
+             "https://github.com/facebookresearch/sam-3d-body.git", SAM3D_DIR],
+            check=True,
+        )
     if SAM3D_DIR not in sys.path:
         sys.path.insert(0, SAM3D_DIR)
 
     os.environ.setdefault("PYOPENGL_PLATFORM", "egl")
     os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
-    return SAM3D_DIR, np, os, sys
+    return SAM3D_DIR, importlib, np, os, subprocess, sys
 
 
 @app.cell
@@ -98,11 +110,11 @@ def _(mo, os):
 def _(hf_token, mo):
     from huggingface_hub import login
 
+    _result = mo.md("⚠️ Enter your Hugging Face token above, then continue.").callout(kind="warn")
     if hf_token.value:
         login(token=hf_token.value, add_to_git_credential=False)
-        mo.md("✅ Authenticated with Hugging Face.").callout(kind="success")
-    else:
-        mo.md("⚠️ Enter your Hugging Face token above, then continue.").callout(kind="warn")
+        _result = mo.md("✅ Authenticated with Hugging Face.").callout(kind="success")
+    _result
     return login,
 
 
@@ -131,9 +143,14 @@ def _(mo):
 
 
 @app.cell
-def _(hf_repo, mo):
+def _(SAM3D_DIR, hf_repo, importlib, mo, os):
     import torch
-    from notebook.utils import setup_sam_3d_body
+
+    _utils_path = os.path.join(SAM3D_DIR, "notebook", "utils.py")
+    _spec = importlib.util.spec_from_file_location("sam3d_notebook_utils", _utils_path)
+    _mod = importlib.util.module_from_spec(_spec)
+    _spec.loader.exec_module(_mod)
+    setup_sam_3d_body = _mod.setup_sam_3d_body
 
     load_btn = mo.ui.run_button(label="Load SAM 3D Body model")
     load_btn
@@ -225,10 +242,13 @@ def _(conf_slider, estimator, img_rgb, mo):
 
 
 @app.cell
-def _(cv2, estimator, faces, img_bgr, mo, people):
+def _(SAM3D_DIR, cv2, estimator, faces, img_bgr, importlib, mo, os, people):
     if people and estimator is not None:
-        from tools.vis_utils import visualize_sample_together
-        rend = visualize_sample_together(img_bgr, people, faces)
+        _vis_path = os.path.join(SAM3D_DIR, "tools", "vis_utils.py")
+        _spec = importlib.util.spec_from_file_location("sam3d_vis_utils", _vis_path)
+        _mod = importlib.util.module_from_spec(_spec)
+        _spec.loader.exec_module(_mod)
+        rend = _mod.visualize_sample_together(img_bgr, people, faces)
         mo.image(cv2.cvtColor(rend, cv2.COLOR_BGR2RGB), caption="Detection + mesh overlay")
     return
 
