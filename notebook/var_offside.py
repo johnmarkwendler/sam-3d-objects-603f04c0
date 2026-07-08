@@ -172,9 +172,10 @@ def _(install_btn, mo, os, subprocess, sys):
                 "braceexpand", "matplotlib",
             ], check=True)
 
+            subprocess.run([_pybin, "-m", "pip", "install", "pycocotools"], check=True)
             subprocess.run([_pybin, "-m", "pip", "install",
-                "--no-build-isolation", "xtcocotools", "pycocotools"
-            ], check=True)
+                "--no-build-isolation", "xtcocotools"
+            ], check=False)
 
             os.environ.pop("FORCE_CUDA", None)
             os.environ.pop("CUDA_HOME", None)
