@@ -56,7 +56,7 @@ python -m pip install \
   einops timm dill pandas rich hydra-core hydra-submitit-launcher \
   hydra-colorlog pyrootutils webdataset chump "networkx==3.2.1" roma \
   joblib seaborn appdirs jsonlines loguru optree \
-  fvcore trimesh plotly
+  fvcore trimesh plotly kaleido
 
 # Build-from-source packages (need numpy at build time, so --no-build-isolation)
 python -m pip install --no-build-isolation xtcocotools pycocotools

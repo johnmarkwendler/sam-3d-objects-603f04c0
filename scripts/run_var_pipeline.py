@@ -138,7 +138,10 @@ def main():
     # --- Step 6: Build the 3D scene ---
     fig, any_off = build_scene(placed, faces, plane_x, attack_sign, defender_ids, masks)
     fig.write_html(str(ARTIFACT_DIR / "var_3d_scene.html"), include_plotlyjs="cdn")
-    fig.write_image(str(ARTIFACT_DIR / "var_3d_scene.png"), width=1200, height=640)
+    try:
+        fig.write_image(str(ARTIFACT_DIR / "var_3d_scene.png"), width=1200, height=640)
+    except Exception as e:
+        print(f"PNG export skipped: {e}")
 
     # --- Step 7: Save per-player meshes as PLY ---
     import trimesh
