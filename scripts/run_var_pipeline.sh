@@ -43,12 +43,15 @@ python -m pip install --index-url https://download.pytorch.org/whl/cu121 \
 
 python -m pip install "huggingface-hub[cli]<1.0"
 
+# Install numpy + cython first (needed for building xtcocotools from source)
+python -m pip install numpy cython
+
 # Install SAM 3D Body dependencies
 python -m pip install \
   pytorch-lightning pyrender opencv-python-headless yacs scikit-image \
   einops timm dill pandas rich hydra-core hydra-submitit-launcher \
   hydra-colorlog pyrootutils webdataset chump "networkx==3.2.1" roma \
-  joblib seaborn appdirs cython jsonlines xtcocotools loguru optree \
+  joblib seaborn appdirs jsonlines xtcocotools loguru optree \
   fvcore pycocotools trimesh plotly
 
 # Install detectron2 (pinned, built from source against installed torch)
