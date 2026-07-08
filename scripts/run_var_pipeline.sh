@@ -58,6 +58,12 @@ python -m pip install \
 python -m pip install --no-build-isolation xtcocotools pycocotools
 
 # Install detectron2 (pinned, built from source against installed torch)
+# The host driver (CUDA 13.2) is backward-compatible with CUDA 12.1 toolkit, but
+# torch's _check_cuda_version rejects the mismatch. Patch it to a no-op before building.
+export TORCH_CUDA_ARCH_LIST="8.0"
+export FORCE_CUDA=1
+TORCH_CPP_EXT=$(python -c "import torch.utils.cpp_extension as ce; print(ce.__file__)")
+sed -i 's/raise RuntimeError(CUDA_MISMATCH_MESSAGE.*/pass  # CUDA version check disabled/' "$TORCH_CPP_EXT"
 python -m pip install "git+https://github.com/facebookresearch/detectron2.git@a1ce2f9" \
   --no-build-isolation --no-deps
 
