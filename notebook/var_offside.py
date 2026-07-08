@@ -72,6 +72,8 @@ def _():
     import subprocess
     import importlib
     import importlib.util
+    import base64
+    import json
     import numpy as np
 
     SAM3D_DIR = os.environ.get("SAM3D_DIR", "/root/sam-3d-body")
@@ -89,7 +91,7 @@ def _():
 
     os.environ.setdefault("PYOPENGL_PLATFORM", "egl")
     os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
-    return SAM3D_DIR, importlib, np, os, subprocess, sys
+    return SAM3D_DIR, base64, importlib, json, np, os, subprocess, sys
 
 
 @app.cell
@@ -315,45 +317,81 @@ def _(mo):
         r"""
         ## 4. Set Goal-Parallel Lines
 
-        Two goal-parallel lines fix the offside axis via their vanishing point.
-        Enter the x,y coordinates of 4 points (2 per line), or use **Auto-detect**
-        to find pitch lines from HSV color matching. The overlay shows your lines
-        on the image.
+        **Click 4 points** on the image below: points 1-2 define line 1 (yellow),
+        points 3-4 define line 2 (red). Both lines should be parallel to the goal
+        line. This fixes the offside axis via the vanishing point.
+
+        Click **Clear** to reset. The coordinates are in image pixel space.
         """
     )
     return
 
 
 @app.cell
-def _(img_rgb, mo):
-    _h, _w = img_rgb.shape[:2] if img_rgb is not None else (1000, 1000)
-    line_pts = mo.ui.array([
-        mo.ui.number(0, _w, value=int(_w * 0.15), label="Line 1 x1"),
-        mo.ui.number(0, _h, value=int(_h * 0.2), label="Line 1 y1"),
-        mo.ui.number(0, _w, value=int(_w * 0.15), label="Line 1 x2"),
-        mo.ui.number(0, _h, value=int(_h * 0.8), label="Line 1 y2"),
-        mo.ui.number(0, _w, value=int(_w * 0.85), label="Line 2 x1"),
-        mo.ui.number(0, _h, value=int(_h * 0.2), label="Line 2 y1"),
-        mo.ui.number(0, _w, value=int(_w * 0.85), label="Line 2 x2"),
-        mo.ui.number(0, _h, value=int(_h * 0.8), label="Line 2 y2"),
-    ]) if img_rgb is not None else None
+def _(base64, cv2, img_bgr, mo):
+    _b64 = ""
+    if img_bgr is not None:
+        _, _buf = cv2.imencode('.jpg', img_bgr, [cv2.IMWRITE_JPEG_QUALITY, 85])
+        _b64 = base64.b64encode(_buf).decode('utf-8')
+
+    line_pts = mo.ui.html(f'''<input type="hidden" value="" />
+<div id="cc" style="position:relative; display:inline-block; max-width:100%;">
+  <img src="data:image/jpeg;base64,{_b64}" id="ccimg"
+       style="max-width:100%; display:block; cursor:crosshair;" />
+  <canvas id="cccv" style="position:absolute; top:0; left:0; pointer-events:none;"></canvas>
+</div>
+<div style="margin-top:6px;">
+  <button id="ccclr" style="padding:5px 12px; background:#7c3aed; color:#fff; border:none; border-radius:6px; cursor:pointer;">Clear</button>
+  <span style="margin-left:8px; color:#666; font-size:0.85rem;">Click 4 points on the image (yellow = line 1, red = line 2)</span>
+</div>
+<script>
+(function() {{
+  var img = document.getElementById('ccimg');
+  var cv = document.getElementById('cccv');
+  var inp = document.querySelector('input[type=hidden]');
+  var clr = document.getElementById('ccclr');
+  var pts = [];
+  function fit() {{ cv.width = img.clientWidth; cv.height = img.clientHeight; draw(); }}
+  function draw() {{
+    var ctx = cv.getContext('2d');
+    ctx.clearRect(0,0,cv.width,cv.height);
+    var sx = img.naturalWidth / cv.width || 1;
+    var sy = img.naturalHeight / cv.height || 1;
+    pts.forEach(function(p,i) {{
+      var dx = p[0]/sx, dy = p[1]/sy;
+      ctx.fillStyle = i < 2 ? '#ffff00' : '#ff0000';
+      ctx.beginPath(); ctx.arc(dx,dy,8,0,2*Math.PI); ctx.fill();
+      ctx.strokeStyle='#000'; ctx.lineWidth=2; ctx.stroke();
+      ctx.fillStyle='#000'; ctx.font='bold 13px sans-serif';
+      ctx.fillText(String(i+1), dx-4, dy+5);
+    }});
+    if(pts.length>=2){{ ctx.strokeStyle='#ffff00'; ctx.lineWidth=3; ctx.beginPath();
+      ctx.moveTo(pts[0][0]/sx,pts[0][1]/sy); ctx.lineTo(pts[1][0]/sx,pts[1][1]/sy); ctx.stroke(); }}
+    if(pts.length>=4){{ ctx.strokeStyle='#ff0000'; ctx.beginPath();
+      ctx.moveTo(pts[2][0]/sx,pts[2][1]/sy); ctx.lineTo(pts[3][0]/sx,pts[3][1]/sy); ctx.stroke(); }}
+  }}
+  img.addEventListener('click', function(e) {{
+    var r = img.getBoundingClientRect();
+    var sx = img.naturalWidth / r.width || 1;
+    var sy = img.naturalHeight / r.height || 1;
+    var x = Math.round((e.clientX - r.left) * sx);
+    var y = Math.round((e.clientY - r.top) * sy);
+    pts.push([x,y]);
+    if(pts.length>4) pts = pts.slice(-4);
+    inp.value = JSON.stringify(pts);
+    inp.dispatchEvent(new Event('input', {{bubbles:true}}));
+    draw();
+  }});
+  clr.addEventListener('click', function() {{
+    pts = []; inp.value=''; inp.dispatchEvent(new Event('input',{{bubbles:true}})); draw();
+  }});
+  if(img.complete) fit(); else img.addEventListener('load', fit);
+  window.addEventListener('resize', fit);
+}})();
+</script>''') if img_bgr is not None else None
+
     line_pts
     return line_pts,
-
-
-@app.cell
-def _(cv2, img_bgr, line_pts, mo, np):
-    _out = mo.md("_Upload an image to draw lines._")
-    if img_bgr is not None and line_pts is not None:
-        _overlay = img_bgr.copy()
-        _pts = [[int(line_pts[i].value) for i in range(j, j+4)] for j in (0, 4)]
-        for _k, (_x1, _y1, _x2, _y2) in enumerate(_pts):
-            _col = (0, 255, 255) if _k == 0 else (0, 0, 255)
-            cv2.line(_overlay, (_x1, _y1), (_x2, _y2), _col, 3)
-        _out = mo.image(cv2.cvtColor(_overlay, cv2.COLOR_BGR2RGB),
-                        caption="Yellow = Line 1, Red = Line 2")
-    _out
-    return
 
 
 @app.cell
@@ -539,13 +577,17 @@ def _(np):
 def _(
         attack_dir, build_btn, defenders, estimator, faces, flip_up, img_rgb,
         line_pts, mo, np, people, selected_players,
-        build_scene, goal_dir_from_lines, non_arm_mask, offside_plane_x, place_players
+        build_scene, goal_dir_from_lines, non_arm_mask, offside_plane_x, place_players,
+        json
     ):
     scene_html = None
     verdict = None
 
-    if build_btn.value and people and line_pts is not None:
-        pts = np.array([line_pts[i].value for i in range(8)], dtype=float).reshape(4, 2)
+    _pts_raw = line_pts.value if (line_pts is not None and line_pts.value) else "[]"
+    _pts_list = json.loads(_pts_raw) if isinstance(_pts_raw, str) else _pts_raw
+
+    if build_btn.value and people and len(_pts_list) >= 4:
+        pts = np.array(_pts_list[:4], dtype=float)
         selected = [int(i) for i in selected_players.value]
         h, w = img_rgb.shape[:2]
         focal = float(people[0]["focal_length"])
@@ -584,8 +626,10 @@ def _(
                   f"| Offside plane X: **{plane_x:.2f} m**"),
             mo.Html(scene_html),
         ])
+    elif build_btn.value and len(_pts_list) < 4:
+        mo.md(f"⚠️ Click 4 points on the image (you have {len(_pts_list)}).").callout(kind="warn")
     else:
-        mo.md("_Detect players and set lines first._").callout()
+        mo.md("_Detect players and click 4 points on the image first._").callout()
     return
 
 
