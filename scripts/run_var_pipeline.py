@@ -186,7 +186,7 @@ def main():
         "cuda_device_name": torch.cuda.get_device_name(0) if torch.cuda.is_available() else None,
         "python": platform.python_version(),
     }
-    (ARTIFACT_DIR / "metadata.json").write_text(json.dumps(metadata, indent=2) + "\n")
+    (ARTIFACT_DIR / "metadata.json").write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
 
     # --- Write EVAL.md ---
     margins_table = "\n".join(
@@ -247,7 +247,7 @@ The companion marimo notebook (`notebook/var_offside.py`) provides an interactiv
 version of this pipeline with UI controls for line drawing, player selection, and
 defender marking — designed for the molab Notebook Competition.
 """
-    (ARTIFACT_DIR / "EVAL.md").write_text(eval_md)
+    (ARTIFACT_DIR / "EVAL.md").write_text(eval_md, encoding="utf-8")
     print(eval_md)
 
 
