@@ -33,18 +33,32 @@ from var_geometry import (
 
 
 def download_sample_image():
-    """Download a sample soccer frame from Wikimedia Commons."""
+    """Get a sample image with people. Tries Wikimedia, falls back to sam-3d-body's dancing.jpg."""
+    img_path = ROOT / "data" / "soccer_sample.jpg"
+    img_path.parent.mkdir(parents=True, exist_ok=True)
+    if img_path.exists():
+        return str(img_path)
+
+    # Try downloading a soccer image with a proper User-Agent
     import urllib.request
     url = (
         "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4d/"
         "Football_in_Bloomington%2C_Indiana%2C_2014.jpg/1280px-"
         "Football_in_Bloomington%2C_Indiana%2C_2014.jpg"
     )
-    img_path = ROOT / "data" / "soccer_sample.jpg"
-    img_path.parent.mkdir(parents=True, exist_ok=True)
-    if not img_path.exists():
-        print(f"Downloading sample soccer image from {url}...")
-        urllib.request.urlretrieve(url, str(img_path))
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            img_path.write_bytes(resp.read())
+        print(f"Downloaded sample soccer image from Wikimedia")
+    except Exception as e:
+        print(f"Wikimedia download failed ({e}), using sam-3d-body dancing.jpg instead")
+        sam3d_img = Path(os.environ.get("SAM3D_DIR", str(ROOT / "sam-3d-body"))) / "notebook" / "images" / "dancing.jpg"
+        if sam3d_img.exists():
+            import shutil
+            shutil.copy(str(sam3d_img), str(img_path))
+        else:
+            raise RuntimeError(f"No sample image available (tried {url} and {sam3d_img})")
     return str(img_path)
 
 
