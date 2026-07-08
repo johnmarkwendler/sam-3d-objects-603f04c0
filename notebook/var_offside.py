@@ -159,6 +159,7 @@ def _(install_btn, mo, os, subprocess, sys):
             _pybin = sys.executable
 
             subprocess.run([_pybin, "-m", "pip", "install", "setuptools<81"], check=True)
+            subprocess.run([_pybin, "-m", "pip", "install", "numpy", "cython"], check=True)
 
             subprocess.run([_pybin, "-m", "pip", "install"] + [
                 "pytorch-lightning", "pyrender", "opencv-python-headless",
@@ -166,9 +167,13 @@ def _(install_btn, mo, os, subprocess, sys):
                 "rich", "hydra-core", "hydra-submitit-launcher",
                 "hydra-colorlog", "pyrootutils", "webdataset", "chump",
                 "networkx==3.2.1", "roma", "joblib", "seaborn", "appdirs",
-                "cython", "jsonlines", "xtcocotools", "loguru", "optree",
-                "fvcore", "pycocotools", "trimesh", "plotly", "kaleido",
+                "jsonlines", "loguru", "optree",
+                "fvcore", "trimesh", "plotly", "kaleido",
                 "braceexpand", "matplotlib",
+            ], check=True)
+
+            subprocess.run([_pybin, "-m", "pip", "install",
+                "--no-build-isolation", "xtcocotools", "pycocotools"
             ], check=True)
 
             os.environ.pop("FORCE_CUDA", None)
