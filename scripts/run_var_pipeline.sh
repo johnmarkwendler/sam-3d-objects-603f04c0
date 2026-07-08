@@ -46,13 +46,16 @@ python -m pip install "huggingface-hub[cli]<1.0"
 # Install numpy + cython first (needed for building xtcocotools from source)
 python -m pip install numpy cython
 
-# Install SAM 3D Body dependencies
+# Install SAM 3D Body dependencies (packages that build from source use --no-build-isolation)
 python -m pip install \
   pytorch-lightning pyrender opencv-python-headless yacs scikit-image \
   einops timm dill pandas rich hydra-core hydra-submitit-launcher \
   hydra-colorlog pyrootutils webdataset chump "networkx==3.2.1" roma \
-  joblib seaborn appdirs jsonlines xtcocotools loguru optree \
-  fvcore pycocotools trimesh plotly
+  joblib seaborn appdirs jsonlines loguru optree \
+  fvcore trimesh plotly
+
+# Build-from-source packages (need numpy at build time, so --no-build-isolation)
+python -m pip install --no-build-isolation xtcocotools pycocotools
 
 # Install detectron2 (pinned, built from source against installed torch)
 python -m pip install "git+https://github.com/facebookresearch/detectron2.git@a1ce2f9" \
