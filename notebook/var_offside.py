@@ -143,10 +143,15 @@ def _(mo):
 
 
 @app.cell
-def _(mo, os, subprocess, sys):
-    _install_btn = mo.ui.run_button(label="Install dependencies (detectron2, MoGe2)")
-    _install_btn
-    if _install_btn.value:
+def _(mo):
+    install_btn = mo.ui.run_button(label="Install dependencies (detectron2, MoGe2)")
+    install_btn
+    return install_btn,
+
+
+@app.cell
+def _(install_btn, mo, os, subprocess, sys):
+    if install_btn.value:
         import torch as _torch
         with mo.status.spinner(title="Installing detectron2 + MoGe2..."):
             _pybin = sys.executable
@@ -168,6 +173,8 @@ def _(mo, os, subprocess, sys):
                 "git+https://github.com/microsoft/MoGe.git"
             ], check=False)
         mo.md("✅ Dependencies installed.").callout(kind="success")
+    else:
+        mo.md("Click the button above to install detectron2 and MoGe2.").callout(kind="info")
     return
 
 
@@ -255,10 +262,15 @@ def _(mo):
 
 
 @app.cell
-def _(conf_slider, estimator, img_rgb, mo):
-    people = []
+def _(conf_slider, mo):
     detect_btn = mo.ui.run_button(label="Detect players")
     detect_btn
+    return conf_slider, detect_btn,
+
+
+@app.cell
+def _(conf_slider, detect_btn, estimator, img_rgb, mo):
+    people = []
     if detect_btn.value and estimator is not None and img_rgb is not None:
         with mo.status.spinner(title="Detecting players..."):
             outputs = estimator.process_one_image(img_rgb, bbox_thr=conf_slider.value)
@@ -266,7 +278,7 @@ def _(conf_slider, estimator, img_rgb, mo):
         mo.md(f"**Detected {len(people)} players**").callout(kind="success")
     else:
         mo.md("_Load the model and upload an image first._").callout()
-    return detect_btn, people
+    return people,
 
 
 @app.cell
