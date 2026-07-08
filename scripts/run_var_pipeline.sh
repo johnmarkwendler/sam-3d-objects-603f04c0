@@ -32,6 +32,10 @@ source "$ENV_DIR/bin/activate"
 
 python -m pip install --upgrade pip setuptools wheel
 
+# pkg_resources is used by detectron2; newer setuptools (>=81) removed it.
+# Pin setuptools<81 to keep pkg_resources available.
+python -m pip install "setuptools<81"
+
 python - <<'PY'
 import sys
 print("python", sys.version)
