@@ -153,12 +153,13 @@ def _(mo):
 def _(install_btn, mo, os, subprocess, sys):
     if install_btn.value:
         import torch as _torch
+        import torch.utils.cpp_extension as _cpp_ext
         with mo.status.spinner(title="Installing detectron2 + MoGe2..."):
             _pybin = sys.executable
             subprocess.run([_pybin, "-m", "pip", "install", "setuptools<81"], check=True)
             os.environ["TORCH_CUDA_ARCH_LIST"] = "8.0"
             os.environ["FORCE_CUDA"] = "1"
-            _cpp = _torch.utils.cpp_extension.__file__
+            _cpp = _cpp_ext.__file__
             import re as _re
             _src = open(_cpp).read()
             _src = _re.sub(r"raise RuntimeError\(CUDA_MISMATCH_MESSAGE.*", "pass", _src)
