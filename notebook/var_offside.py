@@ -283,13 +283,15 @@ def _(conf_slider, mo):
 @app.cell
 def _(conf_slider, detect_btn, estimator, img_rgb, mo):
     people = []
+    _msg = mo.md("_Load the model and upload an image first, then click **Detect players**._").callout()
     if detect_btn.value and estimator is not None and img_rgb is not None:
         with mo.status.spinner(title="Detecting players..."):
             outputs = estimator.process_one_image(img_rgb, bbox_thr=conf_slider.value)
         people = outputs
-        mo.md(f"**Detected {len(people)} players**").callout(kind="success")
-    else:
-        mo.md("_Load the model and upload an image first._").callout()
+        _msg = mo.md(f"**Detected {len(people)} players** — meshes reconstructed in 3D.").callout(kind="success")
+    elif detect_btn.value and (estimator is None or img_rgb is None):
+        _msg = mo.md("⚠️ Load the model and upload an image first.").callout(kind="warn")
+    _msg
     return people,
 
 
@@ -302,6 +304,8 @@ def _(SAM3D_DIR, cv2, estimator, faces, img_bgr, importlib, mo, os, people):
         _spec.loader.exec_module(_mod)
         rend = _mod.visualize_sample_together(img_bgr, people, faces)
         mo.image(cv2.cvtColor(rend, cv2.COLOR_BGR2RGB), caption="Detection + mesh overlay")
+    elif people is not None and not people:
+        mo.md("_No players detected yet. Click **Detect players** above._")
     return
 
 
@@ -309,13 +313,12 @@ def _(SAM3D_DIR, cv2, estimator, faces, img_bgr, importlib, mo, os, people):
 def _(mo):
     mo.md(
         r"""
-        ## 4. Draw Goal-Parallel Lines
+        ## 4. Set Goal-Parallel Lines
 
-        Click **4 points** on the image below: first 2 points define line 1, next 2
-        define line 2. Both lines should be parallel to the goal line. This fixes the
-        offside axis via the vanishing point.
-
-        Or click **Auto-detect** to find pitch lines automatically.
+        Two goal-parallel lines fix the offside axis via their vanishing point.
+        Enter the x,y coordinates of 4 points (2 per line), or use **Auto-detect**
+        to find pitch lines from HSV color matching. The overlay shows your lines
+        on the image.
         """
     )
     return
@@ -323,12 +326,34 @@ def _(mo):
 
 @app.cell
 def _(img_rgb, mo):
-    line_pts = mo.ui.point_collection_drawing(
-        img_rgb,
-        labeling_instructions="Click 4 points: 2 for each goal-parallel line"
-    ) if img_rgb is not None else None
+    _h, _w = img_rgb.shape[:2] if img_rgb is not None else (1000, 1000)
+    line_pts = mo.ui.array([
+        mo.ui.number(0, _w, value=int(_w * 0.15), label="Line 1 x1"),
+        mo.ui.number(0, _h, value=int(_h * 0.2), label="Line 1 y1"),
+        mo.ui.number(0, _w, value=int(_w * 0.15), label="Line 1 x2"),
+        mo.ui.number(0, _h, value=int(_h * 0.8), label="Line 1 y2"),
+        mo.ui.number(0, _w, value=int(_w * 0.85), label="Line 2 x1"),
+        mo.ui.number(0, _h, value=int(_h * 0.2), label="Line 2 y1"),
+        mo.ui.number(0, _w, value=int(_w * 0.85), label="Line 2 x2"),
+        mo.ui.number(0, _h, value=int(_h * 0.8), label="Line 2 y2"),
+    ]) if img_rgb is not None else None
     line_pts
     return line_pts,
+
+
+@app.cell
+def _(cv2, img_bgr, line_pts, mo, np):
+    _out = mo.md("_Upload an image to draw lines._")
+    if img_bgr is not None and line_pts is not None:
+        _overlay = img_bgr.copy()
+        _pts = [[int(line_pts[i].value) for i in range(j, j+4)] for j in (0, 4)]
+        for _k, (_x1, _y1, _x2, _y2) in enumerate(_pts):
+            _col = (0, 255, 255) if _k == 0 else (0, 0, 255)
+            cv2.line(_overlay, (_x1, _y1), (_x2, _y2), _col, 3)
+        _out = mo.image(cv2.cvtColor(_overlay, cv2.COLOR_BGR2RGB),
+                        caption="Yellow = Line 1, Red = Line 2")
+    _out
+    return
 
 
 @app.cell
@@ -520,50 +545,47 @@ def _(
     verdict = None
 
     if build_btn.value and people and line_pts is not None:
-        pts = line_pts.value
-        if len(pts) >= 4:
-            selected = [int(i) for i in selected_players.value]
-            h, w = img_rgb.shape[:2]
-            focal = float(people[0]["focal_length"])
+        pts = np.array([line_pts[i].value for i in range(8)], dtype=float).reshape(4, 2)
+        selected = [int(i) for i in selected_players.value]
+        h, w = img_rgb.shape[:2]
+        focal = float(people[0]["focal_length"])
 
-            p_dict = {}
-            for i in selected:
-                p = people[i]
-                p_dict[i] = {
-                    "bbox": np.asarray(p["bbox"]).reshape(-1)[:4].astype(float),
-                    "pred_vertices": np.asarray(p["pred_vertices"], dtype=np.float32),
-                    "pred_cam_t": np.asarray(p["pred_cam_t"], dtype=np.float32).reshape(3),
-                    "focal_length": float(np.asarray(p["focal_length"]).reshape(-1)[0]),
-                    "pred_keypoints_3d": (
-                        np.asarray(p["pred_keypoints_3d"], dtype=np.float32)
-                        if p.get("pred_keypoints_3d") is not None else None
-                    ),
-                }
+        p_dict = {}
+        for i in selected:
+            p = people[i]
+            p_dict[i] = {
+                "bbox": np.asarray(p["bbox"]).reshape(-1)[:4].astype(float),
+                "pred_vertices": np.asarray(p["pred_vertices"], dtype=np.float32),
+                "pred_cam_t": np.asarray(p["pred_cam_t"], dtype=np.float32).reshape(3),
+                "focal_length": float(np.asarray(p["focal_length"]).reshape(-1)[0]),
+                "pred_keypoints_3d": (
+                    np.asarray(p["pred_keypoints_3d"], dtype=np.float32)
+                    if p.get("pred_keypoints_3d") is not None else None
+                ),
+            }
 
-            goal_dir = goal_dir_from_lines(pts, focal, w, h)
-            placed = place_players(p_dict, selected, goal_dir, flip_up=flip_up.value)
+        goal_dir = goal_dir_from_lines(pts, focal, w, h)
+        placed = place_players(p_dict, selected, goal_dir, flip_up=flip_up.value)
 
-            attack_sign = -1 if attack_dir.value.startswith("−") else +1
-            dset = [int(d) for d in defenders.value]
-            masks = {i: non_arm_mask(p_dict[i]) for i in selected}
-            plane_x = offside_plane_x(placed, attack_sign, dset, masks)
+        attack_sign = -1 if attack_dir.value.startswith("−") else +1
+        dset = [int(d) for d in defenders.value]
+        masks = {i: non_arm_mask(p_dict[i]) for i in selected}
+        plane_x = offside_plane_x(placed, attack_sign, dset, masks)
 
-            fig, any_off = build_scene(placed, faces, plane_x, attack_sign, dset, masks)
-            verdict = "OFFSIDE" if any_off else "NO OFFSIDE"
-            scene_html = fig.to_html(include_plotlyjs="cdn", full_html=False)
+        fig, any_off = build_scene(placed, faces, plane_x, attack_sign, dset, masks)
+        verdict = "OFFSIDE" if any_off else "NO OFFSIDE"
+        scene_html = fig.to_html(include_plotlyjs="cdn", full_html=False)
 
-            med_h = float(np.median([placed[i][:, 2].max() for i in selected]))
-            mo.vstack([
-                mo.md(f"### Verdict: {verdict}").callout(
-                    kind="danger" if any_off else "success"),
-                mo.md(f"Median player height: **{med_h:.2f} m**  "
-                      f"| Offside plane X: **{plane_x:.2f} m**"),
-                mo.Html(scene_html),
-            ])
-        else:
-            mo.md("⚠️ Draw at least 4 points (2 lines) on the image.").callout(kind="warn")
+        med_h = float(np.median([placed[i][:, 2].max() for i in selected]))
+        mo.vstack([
+            mo.md(f"### Verdict: {verdict}").callout(
+                kind="danger" if any_off else "success"),
+            mo.md(f"Median player height: **{med_h:.2f} m**  "
+                  f"| Offside plane X: **{plane_x:.2f} m**"),
+            mo.Html(scene_html),
+        ])
     else:
-        mo.md("_Detect players and draw lines first._").callout()
+        mo.md("_Detect players and set lines first._").callout()
     return
 
 
