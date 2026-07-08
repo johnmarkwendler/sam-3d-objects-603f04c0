@@ -45,7 +45,23 @@ def _(mo):
 
 @app.cell
 def _(mo):
-    mo.md(r"""## Setup & Configuration""")
+    mo.md(
+        r"""
+        ## Setup & Configuration
+
+        ### Hugging Face Access
+
+        SAM 3D Body checkpoints are **gated** on Hugging Face. You need:
+
+        1. A Hugging Face account
+        2. Request access at [facebook/sam-3d-body-dinov3](https://huggingface.co/facebook/sam-3d-body-dinov3)
+        3. A user access token from your [settings page](https://huggingface.co/settings/tokens)
+
+        Paste your token below (it stays in this session and is never stored).
+        If your environment already has `HF_TOKEN` set (e.g. a molab secret), you can
+        skip this step.
+        """
+    )
     return
 
 
@@ -62,6 +78,32 @@ def _():
     os.environ.setdefault("PYOPENGL_PLATFORM", "egl")
     os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
     return SAM3D_DIR, np, os, sys
+
+
+@app.cell
+def _(mo, os):
+    _env_token = os.environ.get("HF_TOKEN", "")
+    hf_token = mo.ui.text(
+        kind="password",
+        label="Hugging Face token" if not _env_token else "Hugging Face token (already set via HF_TOKEN env — override if needed)",
+        placeholder="hf_...",
+        value=_env_token,
+        full_width=True,
+    )
+    hf_token
+    return hf_token,
+
+
+@app.cell
+def _(hf_token, mo):
+    from huggingface_hub import login
+
+    if hf_token.value:
+        login(token=hf_token.value, add_to_git_credential=False)
+        mo.md("✅ Authenticated with Hugging Face.").callout(kind="success")
+    else:
+        mo.md("⚠️ Enter your Hugging Face token above, then continue.").callout(kind="warn")
+    return login,
 
 
 @app.cell
